@@ -1,11 +1,20 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
-import 'theme.dart';
+import 'package:google_fonts/google_fonts.dart';
+import 'state/gallery_state.dart';
 import 'screens/photos_screen.dart';
 import 'screens/folders_screen.dart';
 import 'screens/albums_screen.dart';
 
-void main() => runApp(const GaleriApp());
+void main() {
+  runApp(
+    ChangeNotifierProvider(
+      create: (_) => GalleryState(),
+      child: const GaleriApp(),
+    ),
+  );
+}
 
 class GaleriApp extends StatelessWidget {
   const GaleriApp({super.key});
@@ -15,8 +24,20 @@ class GaleriApp extends StatelessWidget {
     return MaterialApp(
       title: 'Galeri',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.light,
-      darkTheme: AppTheme.dark,
+      theme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, surface: const Color(0xFFF8FAFC)),
+        textTheme: GoogleFonts.interTextTheme(),
+        scaffoldBackgroundColor: const Color(0xFFF8FAFC),
+        appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
+      ),
+      darkTheme: ThemeData(
+        useMaterial3: true,
+        colorScheme: ColorScheme.fromSeed(seedColor: Colors.grey, brightness: Brightness.dark, surface: Colors.black),
+        textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
+        scaffoldBackgroundColor: Colors.black,
+        appBarTheme: const AppBarTheme(backgroundColor: Colors.black, elevation: 0),
+      ),
       themeMode: ThemeMode.system,
       home: const MainNavigation(),
     );
@@ -42,12 +63,22 @@ class _MainNavigationState extends State<MainNavigation> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(
-          ['Photos', 'Folders', 'Albums'][_currentIndex],
-          style: const TextStyle(fontWeight: FontWeight.w600),
-        ),
+        title: Text(['Photos', 'Folders', 'Albums'][_currentIndex], style: const TextStyle(fontWeight: FontWeight.bold)),
+        actions: [
+          if (_currentIndex == 2)
+            IconButton(
+              icon: const Icon(LucideIcons.trash2),
+              onPressed: () {
+                // Fitur sampah (Bisa diintegrasikan ke rute terpisah nanti)
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur Sampah (Dalam Pengembangan)')));
+              },
+            )
+        ],
       ),
-      body: _screens[_currentIndex],
+      body: IndexedStack(
+        index: _currentIndex,
+        children: _screens,
+      ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
         onDestinationSelected: (int index) {
