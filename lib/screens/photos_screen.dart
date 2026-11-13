@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
+import 'package:lucide_icons/lucide_icons.dart';
 
 class PhotosScreen extends StatefulWidget {
   const PhotosScreen({super.key});
@@ -19,19 +20,23 @@ class _PhotosScreenState extends State<PhotosScreen> {
 
   Future<void> _requestPermission() async {
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    if (ps.isAuth) {
+    if (ps.hasAccess) {
       final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
-        type: RequestType.image, // Hanya foto, tidak termasuk video
+        type: RequestType.image,
       );
       if (paths.isNotEmpty) {
         final int count = await paths[0].assetCountAsync;
-        setState(() {
-          _status = 'Izin Diberikan';
-          _photoCount = count;
-        });
+        if (mounted) {
+          setState(() {
+            _status = 'Izin Diberikan';
+            _photoCount = count;
+          });
+        }
       }
     } else {
-      setState(() => _status = 'Izin Ditolak / Web Preview tidak mendukung galeri');
+      if (mounted) {
+        setState(() => _status = 'Izin Ditolak / Web Preview tidak mendukung galeri');
+      }
     }
   }
 
@@ -41,11 +46,11 @@ class _PhotosScreenState extends State<PhotosScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.photo_library, size: 64, color: Theme.of(context).colorScheme.primary),
+          Icon(LucideIcons.camera, size: 64, color: Theme.of(context).colorScheme.primary),
           const SizedBox(height: 16),
           Text(_status, style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
-          Text('Total: $_photoCount foto', style: Theme.of(context).textTheme.headlineSmall),
+          Text('Total: $_photoCount foto', style: Theme.of(context).textTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold)),
         ],
       ),
     );
