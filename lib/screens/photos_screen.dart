@@ -20,7 +20,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
   
   // Variabel untuk mendeteksi pinch
   double _previousScale = 1.0;
-  int _pointerCount = 0; // Menghitung jumlah jari di layar
+  int _pointerCount = 0; 
 
   @override
   void initState() {
@@ -45,10 +45,10 @@ class _PhotosScreenState extends State<PhotosScreen> {
       final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
         type: RequestType.image,
         onlyAll: true, 
-        // Gunakan modifiedDate (tanggal diedit) alih-alih createDate
+        // Menggunakan createDate karena modifiedDate tidak tersedia di versi ini
         filterOption: FilterOptionGroup(
           orders: [
-            const OrderOption(type: OrderOptionType.modifiedDate, asc: false),
+            const OrderOption(type: OrderOptionType.createDate, asc: false),
           ],
         ),
       );
@@ -56,7 +56,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
       if (paths.isNotEmpty) {
         final List<AssetEntity> photos = await paths[0].getAssetListPaged(page: 0, size: 1000);
         
-        // URUTKAN ULANG SECARA MANUAL (Solusi tanggal acak)
+        // URUTKAN ULANG SECARA MANUAL BERDASARKAN TANGGAL EDIT
         photos.sort((a, b) => b.modifiedDateTime.compareTo(a.modifiedDateTime));
         
         _groupPhotos(photos);
@@ -83,7 +83,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
     final yesterday = now.subtract(const Duration(days: 1));
 
     for (var photo in photos) {
-      final date = photo.modifiedDateTime; // Gunakan modifiedDateTime untuk grup
+      final date = photo.modifiedDateTime; // Gunakan tanggal edit
       String key;
       
       if (date.year == now.year && date.month == now.month && date.day == now.day) {
@@ -126,15 +126,14 @@ class _PhotosScreenState extends State<PhotosScreen> {
       return const Center(child: Text('Galeri kosong'));
     }
 
-    // Listener digunakan untuk mendeteksi jari yang menyentuh layar
     return Listener(
       onPointerDown: (event) {
         _pointerCount++;
-        if (_pointerCount == 2) setState(() {}); // Kunci scroll saat 2 jari
+        if (_pointerCount == 2) setState(() {}); 
       },
       onPointerUp: (event) {
         _pointerCount--;
-        if (_pointerCount == 0) setState(() {}); // Buka scroll saat jari dilepas
+        if (_pointerCount == 0) setState(() {}); 
       },
       child: GestureDetector(
         onScaleStart: (details) {
@@ -146,13 +145,11 @@ class _PhotosScreenState extends State<PhotosScreen> {
         onScaleUpdate: (details) {
           if (_pointerCount == 2) {
             if (details.scale > _previousScale + 0.1) {
-              // Cubit menjauh (Zoom in) -> Kolom sedikit (foto besar)
               if (_crossAxisCount > 2) {
                 setState(() => _crossAxisCount--);
                 _previousScale = details.scale;
               }
             } else if (details.scale < _previousScale - 0.1) {
-              // Cubit mendekat (Zoom out) -> Kolom banyak (foto kecil)
               if (_crossAxisCount < 6) {
                 setState(() => _crossAxisCount++);
                 _previousScale = details.scale;
@@ -161,7 +158,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
           }
         },
         child: CustomScrollView(
-          // Jika ada 2 jari, matikan physics scroll agar gestur cubit tidak bentrok
           physics: _pointerCount > 1 ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
           slivers: _groupedPhotos.entries.expand((entry) {
             return [
