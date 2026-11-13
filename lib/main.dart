@@ -8,12 +8,7 @@ import 'screens/folders_screen.dart';
 import 'screens/albums_screen.dart';
 
 void main() {
-  runApp(
-    ChangeNotifierProvider(
-      create: (_) => GalleryState(),
-      child: const GaleriApp(),
-    ),
-  );
+  runApp(ChangeNotifierProvider(create: (_) => GalleryState(), child: const GaleriApp()));
 }
 
 class GaleriApp extends StatelessWidget {
@@ -29,14 +24,12 @@ class GaleriApp extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue, surface: const Color(0xFFF8FAFC)),
         textTheme: GoogleFonts.interTextTheme(),
         scaffoldBackgroundColor: const Color(0xFFF8FAFC),
-        appBarTheme: const AppBarTheme(backgroundColor: Colors.transparent, elevation: 0),
       ),
       darkTheme: ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(seedColor: Colors.grey, brightness: Brightness.dark, surface: Colors.black),
         textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
         scaffoldBackgroundColor: Colors.black,
-        appBarTheme: const AppBarTheme(backgroundColor: Colors.black, elevation: 0),
       ),
       themeMode: ThemeMode.system,
       home: const MainNavigation(),
@@ -53,11 +46,7 @@ class MainNavigation extends StatefulWidget {
 class _MainNavigationState extends State<MainNavigation> {
   int _currentIndex = 0;
 
-  final List<Widget> _screens = const [
-    PhotosScreen(),
-    FoldersScreen(),
-    AlbumsScreen(),
-  ];
+  final List<Widget> _screens = const [PhotosScreen(), FoldersScreen(), AlbumsScreen()];
 
   @override
   Widget build(BuildContext context) {
@@ -65,25 +54,17 @@ class _MainNavigationState extends State<MainNavigation> {
       appBar: AppBar(
         title: Text(['Photos', 'Folders', 'Albums'][_currentIndex], style: const TextStyle(fontWeight: FontWeight.bold)),
         actions: [
-          if (_currentIndex == 2)
+          if (_currentIndex == 0)
             IconButton(
-              icon: const Icon(LucideIcons.trash2),
-              onPressed: () {
-                // Fitur sampah (Bisa diintegrasikan ke rute terpisah nanti)
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur Sampah (Dalam Pengembangan)')));
-              },
-            )
+              icon: const Icon(LucideIcons.arrowUpDown),
+              onPressed: () => context.read<GalleryState>().toggleSort(),
+            ),
         ],
       ),
-      body: IndexedStack(
-        index: _currentIndex,
-        children: _screens,
-      ),
+      body: IndexedStack(index: _currentIndex, children: _screens),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (int index) {
-          setState(() => _currentIndex = index);
-        },
+        onDestinationSelected: (i) => setState(() => _currentIndex = i),
         destinations: const [
           NavigationDestination(icon: Icon(LucideIcons.image), label: 'Photos'),
           NavigationDestination(icon: Icon(LucideIcons.folder), label: 'Folders'),
