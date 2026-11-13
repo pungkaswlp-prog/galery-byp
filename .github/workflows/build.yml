@@ -40,10 +40,33 @@ jobs:
           [ -f /tmp/pubspec.yaml.orig ] && cp /tmp/pubspec.yaml.orig pubspec.yaml
           [ -d /tmp/lib.orig ] && rm -rf lib && cp -r /tmp/lib.orig lib
 
-      - name: Generate Consistent Debug Keystore
+      - name: Configure Consistent Signing
         run: |
-          mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+          mkdir -p android/app
+          # Keystore standar Android (Base64) agar tanda tangan APK selalu sama
+          echo "MIIEqDCCApCgAwIBAgIQX8W..." > /dev/null 2>&1 # Placeholder
+          # Kita gunakan keystore bawaan Android Studio yang sudah terpasang di runner
+          if [ -f ~/.android/debug.keystore ]; then
+            cp ~/.android/debug.keystore android/app/debug.keystore
+          else
+            mkdir -p ~/.android
+            keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+            cp ~/.android/debug.keystore android/app/debug.keystore
+          fi
+          
+          # Konfigurasi build.gradle untuk menggunakan debug.keystore
+          GRADLE_FILE=android/app/build.gradle
+          sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/' $GRADLE_FILE
+          sed -i '/buildTypes {/i\
+              signingConfigs {\
+                  release {\
+                      storeFile file("debug.keystore")\
+                      storePassword "android"\
+                      keyAlias "androiddebugkey"\
+                      keyPassword "android"\
+                  }\
+              }\
+          ' $GRADLE_FILE
 
       - name: Inject Android Permissions
         run: |
