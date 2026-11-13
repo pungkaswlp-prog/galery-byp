@@ -19,7 +19,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
   int _crossAxisCount = 3;
   
   // Variabel untuk mendeteksi pinch
-  double _baseScale = 1.0;
+  double _previousScale = 1.0;
 
   @override
   void initState() {
@@ -71,7 +71,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
     }
   }
 
-  // Fungsi untuk mengelompokkan foto berdasarkan tanggal
   void _groupPhotos(List<AssetEntity> photos) {
     final Map<String, List<AssetEntity>> grouped = {};
     final now = DateTime.now();
@@ -122,26 +121,29 @@ class _PhotosScreenState extends State<PhotosScreen> {
     }
 
     return GestureDetector(
-      // Logika Pinch-to-Zoom
       onScaleStart: (details) {
-        _baseScale = details.scale;
+        _previousScale = 1.0;
       },
       onScaleUpdate: (details) {
-        // Memastikan yang terdeteksi adalah 2 jari (pinch), bukan scroll 1 jari
         if (details.pointerCount == 2) {
-          if (details.scale > _baseScale + 0.1 && _crossAxisCount > 2) {
-            setState(() => _crossAxisCount--);
-            _baseScale = details.scale;
-          } else if (details.scale < _baseScale - 0.1 && _crossAxisCount < 6) {
-            setState(() => _crossAxisCount++);
-            _baseScale = details.scale;
+          if (details.scale > _previousScale + 0.1) {
+            // Cubit menjauh (Zoom in) -> Kolom sedikit (foto besar)
+            if (_crossAxisCount > 2) {
+              setState(() => _crossAxisCount--);
+              _previousScale = details.scale;
+            }
+          } else if (details.scale < _previousScale - 0.1) {
+            // Cubit mendekat (Zoom out) -> Kolom banyak (foto kecil)
+            if (_crossAxisCount < 6) {
+              setState(() => _crossAxisCount++);
+              _previousScale = details.scale;
+            }
           }
         }
       },
       child: CustomScrollView(
         slivers: _groupedPhotos.entries.expand((entry) {
           return [
-            // Header Tanggal
             SliverToBoxAdapter(
               child: Padding(
                 padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 8.0),
@@ -154,7 +156,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
                 ),
               ),
             ),
-            // Grid Foto untuk Tanggal Tersebut
             SliverGrid(
               gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                 crossAxisCount: _crossAxisCount,
