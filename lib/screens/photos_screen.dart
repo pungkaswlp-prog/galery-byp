@@ -4,6 +4,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import 'photo_viewer_screen.dart'; // Import file baru
 
 class PhotosScreen extends StatefulWidget {
   const PhotosScreen({super.key});
@@ -18,7 +19,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
   String _error = '';
   int _crossAxisCount = 3;
   
-  // Variabel untuk mendeteksi pinch
   double _previousScale = 1.0;
   int _pointerCount = 0; 
 
@@ -45,7 +45,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
       final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
         type: RequestType.image,
         onlyAll: true, 
-        // Menggunakan createDate karena modifiedDate tidak tersedia di versi ini
         filterOption: FilterOptionGroup(
           orders: [
             const OrderOption(type: OrderOptionType.createDate, asc: false),
@@ -56,7 +55,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
       if (paths.isNotEmpty) {
         final List<AssetEntity> photos = await paths[0].getAssetListPaged(page: 0, size: 1000);
         
-        // URUTKAN ULANG SECARA MANUAL BERDASARKAN TANGGAL EDIT
         photos.sort((a, b) => b.modifiedDateTime.compareTo(a.modifiedDateTime));
         
         _groupPhotos(photos);
@@ -83,7 +81,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
     final yesterday = now.subtract(const Duration(days: 1));
 
     for (var photo in photos) {
-      final date = photo.modifiedDateTime; // Gunakan tanggal edit
+      final date = photo.modifiedDateTime;
       String key;
       
       if (date.year == now.year && date.month == now.month && date.day == now.day) {
@@ -182,17 +180,31 @@ class _PhotosScreenState extends State<PhotosScreen> {
                 delegate: SliverChildBuilderDelegate(
                   (context, index) {
                     final photo = entry.value[index];
-                    return Container(
-                      decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.surfaceVariant,
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      clipBehavior: Clip.antiAlias,
-                      child: AssetEntityImage(
-                        photo,
-                        isOriginal: false,
-                        thumbnailSize: const ThumbnailSize.square(300),
-                        fit: BoxFit.cover,
+                    return GestureDetector(
+                      onTap: () {
+                        // Navigasi ke Viewer
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => PhotoViewerScreen(
+                              photos: _photos,
+                              initialIndex: _photos.indexOf(photo),
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Theme.of(context).colorScheme.surfaceVariant,
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        clipBehavior: Clip.antiAlias,
+                        child: AssetEntityImage(
+                          photo,
+                          isOriginal: false,
+                          thumbnailSize: const ThumbnailSize.square(300),
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     );
                   },
