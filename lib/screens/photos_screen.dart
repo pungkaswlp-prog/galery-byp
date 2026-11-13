@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
-import 'photo_viewer_screen.dart'; // Import file baru
+import 'photo_viewer_screen.dart';
 
 class PhotosScreen extends StatefulWidget {
   const PhotosScreen({super.key});
@@ -29,16 +28,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
   }
 
   Future<void> _loadPhotos() async {
-    if (kIsWeb) {
-      if (mounted) {
-        setState(() {
-          _error = 'Web Preview tidak mendukung akses galeri. Silakan cek di APK.';
-          _isLoading = false;
-        });
-      }
-      return;
-    }
-
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
     
     if (ps.hasAccess) {
@@ -55,6 +44,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
       if (paths.isNotEmpty) {
         final List<AssetEntity> photos = await paths[0].getAssetListPaged(page: 0, size: 1000);
         
+        // Urutkan manual berdasarkan tanggal edit terbaru
         photos.sort((a, b) => b.modifiedDateTime.compareTo(a.modifiedDateTime));
         
         _groupPhotos(photos);
@@ -68,7 +58,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
     } else {
       if (mounted) {
         setState(() {
-          _error = 'Izin Ditolak';
+          _error = 'Izin Ditolak. Aplikasi membutuhkan akses galeri.';
           _isLoading = false;
         });
       }
@@ -182,7 +172,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
                     final photo = entry.value[index];
                     return GestureDetector(
                       onTap: () {
-                        // Navigasi ke Viewer
                         Navigator.push(
                           context,
                           MaterialPageRoute(
