@@ -21,14 +21,14 @@ class AppTheme {
   static ThemeData get dark => ThemeData(
         useMaterial3: true,
         colorScheme: ColorScheme.fromSeed(
-          seedColor: const Color(0xFF0F172A),
+          seedColor: Colors.grey,
           brightness: Brightness.dark,
-          surface: const Color(0xFF0F172A), // Slate-900
+          surface: Colors.black, // Hitam pekat
         ),
         textTheme: GoogleFonts.interTextTheme(ThemeData.dark().textTheme),
-        scaffoldBackgroundColor: const Color(0xFF0F172A),
+        scaffoldBackgroundColor: Colors.black, // Background hitam pekat
         appBarTheme: const AppBarTheme(
-          backgroundColor: Colors.transparent,
+          backgroundColor: Colors.black,
           elevation: 0,
           centerTitle: false,
         ),
