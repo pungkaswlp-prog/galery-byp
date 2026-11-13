@@ -40,14 +40,18 @@ jobs:
           [ -f /tmp/pubspec.yaml.orig ] && cp /tmp/pubspec.yaml.orig pubspec.yaml
           [ -d /tmp/lib.orig ] && rm -rf lib && cp -r /tmp/lib.orig lib
 
-      - name: Force Consistent Signing
+      - name: Fix SDK and Signing
         run: |
-          # HAPUS keystore bawaan server dan buat yang baru secara konsisten
+          GRADLE_FILE=android/app/build.gradle
+          
+          # 1. Paksa Android SDK 36 untuk photo_manager
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' $GRADLE_FILE
+          
+          # 2. Hapus keystore bawaan server dan buat yang baru secara konsisten
           rm -f ~/.android/debug.keystore
           mkdir -p ~/.android
           keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
           
-          GRADLE_FILE=android/app/build.gradle
           sed -i '/signingConfigs {/,/}/d' $GRADLE_FILE
           sed -i '/buildTypes {/i\
               signingConfigs {\
@@ -59,8 +63,8 @@ jobs:
                   }\
               }\
           ' $GRADLE_FILE
-          sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' $GRADLE_FILE
           sed -i 's/signingConfig = signingConfigs.getByName("debug")/signingConfig = signingConfigs.getByName("release")/g' $GRADLE_FILE
+          sed -i 's/signingConfig signingConfigs.debug/signingConfig signingConfigs.release/g' $GRADLE_FILE
 
       - name: Inject Android Permissions
         run: |
