@@ -20,6 +20,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
   
   // Variabel untuk mendeteksi pinch
   double _previousScale = 1.0;
+  int _pointerCount = 0; // Menghitung jumlah jari di layar
 
   @override
   void initState() {
@@ -44,15 +45,20 @@ class _PhotosScreenState extends State<PhotosScreen> {
       final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
         type: RequestType.image,
         onlyAll: true, 
+        // Gunakan modifiedDate (tanggal diedit) alih-alih createDate
         filterOption: FilterOptionGroup(
           orders: [
-            const OrderOption(type: OrderOptionType.createDate, asc: false),
+            const OrderOption(type: OrderOptionType.modifiedDate, asc: false),
           ],
         ),
       );
       
       if (paths.isNotEmpty) {
         final List<AssetEntity> photos = await paths[0].getAssetListPaged(page: 0, size: 1000);
+        
+        // URUTKAN ULANG SECARA MANUAL (Solusi tanggal acak)
+        photos.sort((a, b) => b.modifiedDateTime.compareTo(a.modifiedDateTime));
+        
         _groupPhotos(photos);
         if (mounted) {
           setState(() {
@@ -77,7 +83,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
     final yesterday = now.subtract(const Duration(days: 1));
 
     for (var photo in photos) {
-      final date = photo.createDateTime;
+      final date = photo.modifiedDateTime; // Gunakan modifiedDateTime untuk grup
       String key;
       
       if (date.year == now.year && date.month == now.month && date.day == now.day) {
@@ -120,70 +126,86 @@ class _PhotosScreenState extends State<PhotosScreen> {
       return const Center(child: Text('Galeri kosong'));
     }
 
-    return GestureDetector(
-      onScaleStart: (details) {
-        _previousScale = 1.0;
+    // Listener digunakan untuk mendeteksi jari yang menyentuh layar
+    return Listener(
+      onPointerDown: (event) {
+        _pointerCount++;
+        if (_pointerCount == 2) setState(() {}); // Kunci scroll saat 2 jari
       },
-      onScaleUpdate: (details) {
-        if (details.pointerCount == 2) {
-          if (details.scale > _previousScale + 0.1) {
-            // Cubit menjauh (Zoom in) -> Kolom sedikit (foto besar)
-            if (_crossAxisCount > 2) {
-              setState(() => _crossAxisCount--);
-              _previousScale = details.scale;
-            }
-          } else if (details.scale < _previousScale - 0.1) {
-            // Cubit mendekat (Zoom out) -> Kolom banyak (foto kecil)
-            if (_crossAxisCount < 6) {
-              setState(() => _crossAxisCount++);
-              _previousScale = details.scale;
+      onPointerUp: (event) {
+        _pointerCount--;
+        if (_pointerCount == 0) setState(() {}); // Buka scroll saat jari dilepas
+      },
+      child: GestureDetector(
+        onScaleStart: (details) {
+          _previousScale = 1.0;
+        },
+        onScaleEnd: (details) {
+          _previousScale = 1.0;
+        },
+        onScaleUpdate: (details) {
+          if (_pointerCount == 2) {
+            if (details.scale > _previousScale + 0.1) {
+              // Cubit menjauh (Zoom in) -> Kolom sedikit (foto besar)
+              if (_crossAxisCount > 2) {
+                setState(() => _crossAxisCount--);
+                _previousScale = details.scale;
+              }
+            } else if (details.scale < _previousScale - 0.1) {
+              // Cubit mendekat (Zoom out) -> Kolom banyak (foto kecil)
+              if (_crossAxisCount < 6) {
+                setState(() => _crossAxisCount++);
+                _previousScale = details.scale;
+              }
             }
           }
-        }
-      },
-      child: CustomScrollView(
-        slivers: _groupedPhotos.entries.expand((entry) {
-          return [
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 8.0),
-                child: Text(
-                  entry.key,
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+        },
+        child: CustomScrollView(
+          // Jika ada 2 jari, matikan physics scroll agar gestur cubit tidak bentrok
+          physics: _pointerCount > 1 ? const NeverScrollableScrollPhysics() : const BouncingScrollPhysics(),
+          slivers: _groupedPhotos.entries.expand((entry) {
+            return [
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.only(left: 16.0, right: 16.0, top: 16.0, bottom: 8.0),
+                  child: Text(
+                    entry.key,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
                   ),
                 ),
               ),
-            ),
-            SliverGrid(
-              gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: _crossAxisCount,
-                crossAxisSpacing: 4,
-                mainAxisSpacing: 4,
+              SliverGrid(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: _crossAxisCount,
+                  crossAxisSpacing: 4,
+                  mainAxisSpacing: 4,
+                ),
+                delegate: SliverChildBuilderDelegate(
+                  (context, index) {
+                    final photo = entry.value[index];
+                    return Container(
+                      decoration: BoxDecoration(
+                        color: Theme.of(context).colorScheme.surfaceVariant,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: AssetEntityImage(
+                        photo,
+                        isOriginal: false,
+                        thumbnailSize: const ThumbnailSize.square(300),
+                        fit: BoxFit.cover,
+                      ),
+                    );
+                  },
+                  childCount: entry.value.length,
+                ),
               ),
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final photo = entry.value[index];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: Theme.of(context).colorScheme.surfaceVariant,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    clipBehavior: Clip.antiAlias,
-                    child: AssetEntityImage(
-                      photo,
-                      isOriginal: false,
-                      thumbnailSize: const ThumbnailSize.square(300),
-                      fit: BoxFit.cover,
-                    ),
-                  );
-                },
-                childCount: entry.value.length,
-              ),
-            ),
-          ];
-        }).toList(),
+            ];
+          }).toList(),
+        ),
       ),
     );
   }
