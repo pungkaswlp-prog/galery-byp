@@ -4,7 +4,7 @@ import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import '../state/gallery_state.dart';
-import 'folder_detail_screen.dart'; // Import layar baru
+import 'folder_detail_screen.dart';
 
 class FoldersScreen extends StatelessWidget {
   const FoldersScreen({super.key});
@@ -18,7 +18,8 @@ class FoldersScreen extends StatelessWidget {
       itemCount: state.allFolders.length,
       itemBuilder: (context, index) {
         final folder = state.allFolders[index];
-        final isHidden = state.hiddenFolders.contains(folder.relativePath);
+        // MENGGUNAKAN folder.id
+        final isHidden = state.hiddenFolders.contains(folder.id);
         
         return ListTile(
           leading: SizedBox(
@@ -37,10 +38,10 @@ class FoldersScreen extends StatelessWidget {
           subtitle: FutureBuilder<int>(future: folder.assetCountAsync, builder: (_, s) => Text('${s.data ?? 0} foto')),
           trailing: IconButton(
             icon: Icon(isHidden ? LucideIcons.eyeOff : LucideIcons.eye),
-            onPressed: () => state.toggleHideFolder(folder.relativePath),
+            // MENGGUNAKAN folder.id
+            onPressed: () => state.toggleHideFolder(folder.id),
           ),
           onTap: () {
-            // Navigasi ke layar isi folder
             Navigator.push(context, MaterialPageRoute(builder: (_) => FolderDetailScreen(folder: folder)));
           },
         );
