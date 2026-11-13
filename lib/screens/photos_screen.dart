@@ -20,27 +20,13 @@ class _PhotosScreenState extends State<PhotosScreen> {
   bool _isSelecting = false;
   List<AssetEntity> _selectedPhotos = [];
 
-  void _toggleSelection(AssetEntity photo) {
-    setState(() {
-      if (_selectedPhotos.contains(photo)) {
-        _selectedPhotos.remove(photo);
-        if (_selectedPhotos.isEmpty) _isSelecting = false;
-      } else {
-        _selectedPhotos.add(photo);
-        _isSelecting = true;
-      }
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     final state = context.watch<GalleryState>();
-    
     if (state.isLoading) return const Center(child: CircularProgressIndicator());
 
     return Column(
       children: [
-        // Filter Label (Hanya tampil jika tidak sedang memilih)
         if (!_isSelecting && state.getAllUniqueLabels().isNotEmpty)
           SizedBox(
             height: 40,
@@ -66,7 +52,6 @@ class _PhotosScreenState extends State<PhotosScreen> {
             ),
           ),
 
-        // Top Bar untuk Multi-Select
         if (_isSelecting)
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -75,9 +60,9 @@ class _PhotosScreenState extends State<PhotosScreen> {
               children: [
                 Text('${_selectedPhotos.length} dipilih', style: const TextStyle(fontWeight: FontWeight.bold)),
                 const Spacer(),
-                IconButton(icon: const Icon(LucideIcons.trash2), onPressed: () { state.moveToTrash(_selectedPhotos); setState(() => _isSelecting = false); }),
-                IconButton(icon: const Icon(LucideIcons.layers), onPressed: () => _showAddToAlbumDialog(context, _selectedPhotos)),
-                IconButton(icon: const Icon(LucideIcons.tag), onPressed: () => _showAddLabelDialog(context, _selectedPhotos)),
+                IconButton(icon: const Icon(LucideIcons.trash2), onPressed: () { state.moveToTrash(_selectedPhotos); setState(() { _isSelecting = false; _selectedPhotos.clear(); }); }),
+                IconButton(icon: const Icon(LucideIcons.layers), onPressed: () => _showAlbumDialog(context, _selectedPhotos)),
+                IconButton(icon: const Icon(LucideIcons.tag), onPressed: () => _showLabelDialog(context, _selectedPhotos)),
                 IconButton(icon: const Icon(LucideIcons.x), onPressed: () => setState(() { _isSelecting = false; _selectedPhotos.clear(); })),
               ],
             ),
@@ -92,13 +77,8 @@ class _PhotosScreenState extends State<PhotosScreen> {
               onScaleEnd: (d) => _previousScale = 1.0,
               onScaleUpdate: (d) {
                 if (_pointerCount == 2) {
-                  if (d.scale > _previousScale + 0.1 && _crossAxisCount > 2) {
-                    setState(() => _crossAxisCount--);
-                    _previousScale = d.scale;
-                  } else if (d.scale < _previousScale - 0.1 && _crossAxisCount < 6) {
-                    setState(() => _crossAxisCount++);
-                    _previousScale = d.scale;
-                  }
+                  if (d.scale > _previousScale + 0.1 && _crossAxisCount > 2) { setState(() => _crossAxisCount--); _previousScale = d.scale; }
+                  else if (d.scale < _previousScale - 0.1 && _crossAxisCount < 6) { setState(() => _crossAxisCount++); _previousScale = d.scale; }
                 }
               },
               child: CustomScrollView(
@@ -120,12 +100,12 @@ class _PhotosScreenState extends State<PhotosScreen> {
                           return GestureDetector(
                             onTap: () {
                               if (_isSelecting) {
-                                _toggleSelection(photo);
+                                setState(() { isSelected ? _selectedPhotos.remove(photo) : _selectedPhotos.add(photo); if (_selectedPhotos.isEmpty) _isSelecting = false; });
                               } else {
                                 Navigator.push(context, MaterialPageRoute(builder: (_) => PhotoViewerScreen(photos: state.allPhotos, initialIndex: state.allPhotos.indexOf(photo))));
                               }
                             },
-                            onLongPress: () => _toggleSelection(photo),
+                            onLongPress: () => setState(() { _isSelecting = true; if (!_selectedPhotos.contains(photo)) _selectedPhotos.add(photo); }),
                             child: Stack(
                               fit: StackFit.expand,
                               children: [
@@ -138,11 +118,7 @@ class _PhotosScreenState extends State<PhotosScreen> {
                                   clipBehavior: Clip.antiAlias,
                                   child: AssetEntityImage(photo, isOriginal: false, thumbnailSize: const ThumbnailSize.square(300), fit: BoxFit.cover),
                                 ),
-                                if (isSelected)
-                                  Container(
-                                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Colors.black.withOpacity(0.3)),
-                                    child: const Center(child: Icon(LucideIcons.checkCircle2, color: Colors.white, size: 32)),
-                                  ),
+                                if (isSelected) Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), color: Colors.black.withOpacity(0.3)), child: const Center(child: Icon(LucideIcons.checkCircle2, color: Colors.white, size: 32))),
                               ],
                             ),
                           );
@@ -160,59 +136,29 @@ class _PhotosScreenState extends State<PhotosScreen> {
     );
   }
 
-  // Dialog Tambah ke Album
-  void _showAddToAlbumDialog(BuildContext context, List<AssetEntity> photos) {
+  void _showAlbumDialog(BuildContext context, List<AssetEntity> photos) {
     final state = context.read<GalleryState>();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tambah ke Album'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: ListView.builder(
-            shrinkWrap: true,
-            itemCount: state.albums.length,
-            itemBuilder: (_, i) => ListTile(
-              leading: const Icon(LucideIcons.folder),
-              title: Text(state.albums[i].name),
-              onTap: () {
-                state.addToAlbum(state.albums[i].id, photos);
-                Navigator.pop(ctx);
-                setState(() { _isSelecting = false; _selectedPhotos.clear(); });
-              },
-            ),
-          ),
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Tambah ke Album'),
+      content: SizedBox(width: double.maxFinite, child: ListView.builder(
+        shrinkWrap: true, itemCount: state.albums.length, itemBuilder: (_, i) => ListTile(
+          title: Text(state.albums[i].name),
+          onTap: () { state.addToAlbum(state.albums[i].id, photos); Navigator.pop(ctx); setState(() { _isSelecting = false; _selectedPhotos.clear(); }); },
         ),
-      ),
-    );
+      )),
+    ));
   }
 
-  // Dialog Tambah Label
-  void _showAddLabelDialog(BuildContext context, List<AssetEntity> photos) {
+  void _showLabelDialog(BuildContext context, List<AssetEntity> photos) {
     final state = context.read<GalleryState>();
     final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Tambah Label'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Misal: Kucing, Liburan'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          TextButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) {
-                state.addLabel(photos, controller.text.trim());
-              }
-              Navigator.pop(ctx);
-              setState(() { _isSelecting = false; _selectedPhotos.clear(); });
-            },
-            child: const Text('Simpan'),
-          ),
-        ],
-      ),
-    );
+    showDialog(context: context, builder: (ctx) => AlertDialog(
+      title: const Text('Tambah Label'),
+      content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Misal: Kucing')),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+        TextButton(onPressed: () { if (controller.text.isNotEmpty) state.addLabel(photos, controller.text.trim()); Navigator.pop(ctx); setState(() { _isSelecting = false; _selectedPhotos.clear(); }); }, child: const Text('Simpan')),
+      ],
+    ));
   }
 }
