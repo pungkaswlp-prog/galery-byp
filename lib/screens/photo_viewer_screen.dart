@@ -1,10 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:extended_image/extended_image.dart';
+import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
+import 'package:photo_view/photo_view.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
 import 'package:exif/exif.dart';
+import 'package:provider/provider.dart';
+import '../state/gallery_state.dart';
 
 class PhotoViewerScreen extends StatefulWidget {
   final List<AssetEntity> photos;
@@ -39,31 +42,14 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     super.dispose();
   }
 
-  void _toggleDetails() {
-    setState(() {
-      _showDetails = !_showDetails;
-    });
-  }
-
   Future<void> _loadExif(AssetEntity photo) async {
-    setState(() {
-      _isLoadingExif = true;
-      _exifData = {};
-    });
-
+    setState(() { _isLoadingExif = true; _exifData = {}; });
     try {
       final File? file = await photo.file;
       if (file != null) {
         final bytes = await file.readAsBytes();
         final tags = await readExifFromBytes(bytes);
-        if (mounted) {
-          setState(() {
-            _exifData = tags;
-            _isLoadingExif = false;
-          });
-        }
-      } else {
-        if (mounted) setState(() => _isLoadingExif = false);
+        if (mounted) setState(() { _exifData = tags; _isLoadingExif = false; });
       }
     } catch (e) {
       if (mounted) setState(() => _isLoadingExif = false);
@@ -78,21 +64,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       body: Stack(
         children: [
           GestureDetector(
-            onTap: () => setState(() {
-              _showUi = !_showUi;
-              if (!_showUi) _showDetails = false;
-            }),
+            onTap: () => setState(() { _showUi = !_showUi; if (!_showUi) _showDetails = false; }),
             onVerticalDragEnd: (details) {
-              if (details.primaryVelocity! < 0) {
-                setState(() {
-                  _showDetails = true;
-                  _showUi = true;
-                });
-              } else if (details.primaryVelocity! > 0) {
-                setState(() {
-                  _showDetails = false;
-                });
-              }
+              if (details.primaryVelocity! < 0) setState(() { _showDetails = true; _showUi = true; });
+              else if (details.primaryVelocity! > 0) setState(() => _showDetails = false);
             },
             child: PageView.builder(
               controller: _pageController,
@@ -107,21 +82,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   future: photo.file,
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data != null) {
-                      return ExtendedImage.file(
-                        snapshot.data!,
-                        fit: BoxFit.contain,
-                        mode: ExtendedImageMode.gesture,
-                        initGestureConfigHandler: (state) {
-                          return GestureConfig(
-                            minScale: 1.0,
-                            maxScale: 5.0,
-                            animationMinScale: 0.7,
-                            animationMaxScale: 5.0,
-                            inertialSpeed: 100.0,
-                            initialScale: 1.0,
-                            inPageView: true,
-                          );
-                        },
+                      return PhotoView(
+                        imageProvider: FileImage(snapshot.data!),
+                        minScale: PhotoViewComputedScale.contained,
+                        maxScale: PhotoViewComputedScale.covered * 2,
+                        filterQuality: FilterQuality.high,
                       );
                     }
                     return const Center(child: CircularProgressIndicator(color: Colors.white));
@@ -131,30 +96,20 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             ),
           ),
           
+          // UI Elements
           if (_showUi)
             Positioned(
               top: 0, left: 0, right: 0,
               child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter, end: Alignment.bottomCenter,
-                    colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-                  ),
-                ),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.topCenter, end: Alignment.bottomCenter, colors: [Colors.black.withOpacity(0.7), Colors.transparent])),
                 child: SafeArea(
                   child: Row(
                     children: [
-                      IconButton(
-                        icon: const Icon(LucideIcons.arrowLeft, color: Colors.white),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+                      IconButton(icon: const Icon(LucideIcons.arrowLeft, color: Colors.white), onPressed: () => Navigator.pop(context)),
                       const Spacer(),
                       Text('${_currentIndex + 1} / ${widget.photos.length}', style: const TextStyle(color: Colors.white)),
                       const Spacer(),
-                      IconButton(
-                        icon: const Icon(LucideIcons.maximize, color: Colors.white),
-                        onPressed: () {},
-                      ),
+                      IconButton(icon: const Icon(LucideIcons.maximize, color: Colors.white), onPressed: () {}),
                     ],
                   ),
                 ),
@@ -166,11 +121,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               bottom: 0, left: 0, right: 0,
               child: Container(
                 padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.95),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-                  border: Border.all(color: Colors.white12),
-                ),
+                decoration: BoxDecoration(color: Colors.black.withOpacity(0.95), borderRadius: const BorderRadius.vertical(top: Radius.circular(24)), border: Border.all(color: Colors.white12)),
                 child: SafeArea(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -180,10 +131,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           const Text('Detail & EXIF', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                          IconButton(
-                            icon: const Icon(LucideIcons.x, color: Colors.white),
-                            onPressed: _toggleDetails,
-                          )
+                          IconButton(icon: const Icon(LucideIcons.x, color: Colors.white), onPressed: () => setState(() => _showDetails = false)),
                         ],
                       ),
                       const Divider(color: Colors.white24),
@@ -211,28 +159,16 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       ),
 
                       if (_isLoadingExif)
-                        const Padding(
-                          padding: EdgeInsets.only(top: 16.0),
-                          child: Center(child: CircularProgressIndicator()),
-                        )
+                        const Padding(padding: EdgeInsets.only(top: 16.0), child: Center(child: CircularProgressIndicator()))
                       else if (_exifData.isNotEmpty) ...[
                         const Divider(color: Colors.white24),
                         const Text('Info Kamera', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        
-                        if (_exifData.containsKey('Image Model')) 
-                          _buildInfoRow('Kamera', _exifData['Image Model']!.printable),
-                        if (_exifData.containsKey('EXIF FNumber')) 
-                          _buildInfoRow('F-Stop', 'f/${_exifData['EXIF FNumber']!.printable}'),
-                        if (_exifData.containsKey('EXIF ExposureTime')) 
-                          _buildInfoRow('Kecepatan', '${_exifData['EXIF ExposureTime']!.printable} s'),
-                        if (_exifData.containsKey('EXIF ISOSpeedRatings')) 
-                          _buildInfoRow('ISO', _exifData['EXIF ISOSpeedRatings']!.printable),
-                        if (_exifData.containsKey('EXIF FocalLength')) 
-                          _buildInfoRow('Focal Length', '${_exifData['EXIF FocalLength']!.printable} mm'),
-                        
-                        if (_exifData.containsKey('EXIF FocalLengthIn35mmFilm')) 
-                          _buildInfoRow('Setara 35mm', '${_exifData['EXIF FocalLengthIn35mmFilm']!.printable} mm'),
+                        if (_exifData.containsKey('Image Model')) _buildInfoRow('Kamera', _exifData['Image Model']!.printable),
+                        if (_exifData.containsKey('EXIF FNumber')) _buildInfoRow('F-Stop', 'f/${_exifData['EXIF FNumber']!.printable}'),
+                        if (_exifData.containsKey('EXIF ExposureTime')) _buildInfoRow('Kecepatan', '${_exifData['EXIF ExposureTime']!.printable} s'),
+                        if (_exifData.containsKey('EXIF ISOSpeedRatings')) _buildInfoRow('ISO', _exifData['EXIF ISOSpeedRatings']!.printable),
+                        if (_exifData.containsKey('EXIF FocalLength')) _buildInfoRow('Focal Length', '${_exifData['EXIF FocalLength']!.printable} mm'),
                       ] else ...[
                         const Divider(color: Colors.white24),
                         const Text('Foto ini tidak memiliki data EXIF kamera.', style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
@@ -248,12 +184,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               bottom: 0, left: 0, right: 0,
               child: Container(
                 padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                    colors: [Colors.black.withOpacity(0.7), Colors.transparent],
-                  ),
-                ),
+                decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Colors.black.withOpacity(0.7), Colors.transparent])),
                 child: SafeArea(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -263,7 +194,10 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       const SizedBox(height: 8),
                       Row(
                         children: [
-                          _actionButton(LucideIcons.trash2, 'Hapus', () {}),
+                          _actionButton(LucideIcons.trash2, 'Hapus', () {
+                            context.read<GalleryState>().moveToTrash([currentPhoto]);
+                            Navigator.pop(context);
+                          }),
                           _actionButton(LucideIcons.folderPlus, 'Album', () {}),
                           _actionButton(LucideIcons.tag, 'Label', () {}),
                           _actionButton(LucideIcons.share2, 'Share', () {}),
