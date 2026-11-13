@@ -14,8 +14,11 @@ dependencies:
   lucide_icons: ^0.257.0
   google_fonts: ^6.2.1
   intl: ^0.19.0
-  extended_image: ^8.2.1 # Pengganti PhotoView (lebih smooth & jernih)
-  exif: ^3.3.0 # Untuk membaca data kamera (ISO, F-stop, dll)
+  photo_view: ^0.15.0
+  exif: ^3.3.0
+  provider: ^6.1.2
+  shared_preferences: ^2.2.3
+  uuid: ^4.4.0
 
 dev_dependencies:
   flutter_test:
