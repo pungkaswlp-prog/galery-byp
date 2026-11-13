@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
@@ -146,7 +147,26 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       _buildInfoRow('Nama File', currentPhoto.title ?? 'Tanpa Nama'),
                       _buildInfoRow('Tanggal', DateFormat('EEEE, d MMMM yyyy - HH:mm').format(currentPhoto.modifiedDateTime)),
                       _buildInfoRow('Resolusi', '${currentPhoto.width} x ${currentPhoto.height}'),
-                      _buildInfoRow('Ukuran', '${(currentPhoto.size / 1024 / 1024).toStringAsFixed(2)} MB'),
+                      
+                      // Perbaikan: Menghitung ukuran file secara async
+                      FutureBuilder<File?>(
+                        future: currentPhoto.file,
+                        builder: (context, snapshot) {
+                          if (snapshot.hasData && snapshot.data != null) {
+                            return FutureBuilder<int>(
+                              future: snapshot.data!.length(),
+                              builder: (context, lengthSnapshot) {
+                                if (lengthSnapshot.hasData) {
+                                  final mb = (lengthSnapshot.data! / (1024 * 1024)).toStringAsFixed(2);
+                                  return _buildInfoRow('Ukuran', '$mb MB');
+                                }
+                                return _buildInfoRow('Ukuran', 'Menghitung...');
+                              }
+                            );
+                          }
+                          return _buildInfoRow('Ukuran', 'Menghitung...');
+                        },
+                      ),
                       // Info EXIF lengkap bisa ditambahkan di sini nanti
                     ],
                   ),
