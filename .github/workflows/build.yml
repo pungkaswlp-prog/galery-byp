@@ -40,10 +40,14 @@ jobs:
           [ -f /tmp/pubspec.yaml.orig ] && cp /tmp/pubspec.yaml.orig pubspec.yaml
           [ -d /tmp/lib.orig ] && rm -rf lib && cp -r /tmp/lib.orig lib
 
+      - name: Generate Consistent Debug Keystore
+        run: |
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Inject Android Permissions
         run: |
           MANIFEST=android/app/src/main/AndroidManifest.xml
-          sed -i 's|<application|<uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />\n    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />\n    <application|' $MANIFEST
+          sed -i 's|<application|<uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />\n    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" android:maxSdkVersion="32" />\n    <uses-permission android:name="android.permission.ACCESS_MEDIA_LOCATION" />\n    <application|' $MANIFEST
 
       - name: Get dependencies
         run: flutter pub get
