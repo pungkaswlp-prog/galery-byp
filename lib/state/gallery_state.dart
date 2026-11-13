@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -22,11 +23,16 @@ class CustomAlbum {
 class GalleryState extends ChangeNotifier {
   List<AssetEntity> allPhotos = [];
   Map<String, List<AssetEntity>> groupedPhotos = {};
+  List<AssetPathEntity> allFolders = [];
+  
   List<CustomAlbum> albums = [];
-  Map<String, List<String>> labels = {}; // ID Foto -> List Label
-  List<String> trashedPhotoIds = [];
+  Map<String, List<String>> photoLabels = {};
+  Map<String, DateTime> trashedItems = {}; // photoId -> tanggal dihapus
+  
   bool isLoading = true;
+  bool isAscending = false; // Urutan: Newest / Oldest
   String selectedLabelFilter = '';
+  Set<String> hiddenFolders = {};
 
   GalleryState() {
     initGallery();
@@ -46,97 +52,141 @@ class GalleryState extends ChangeNotifier {
   Future<void> _loadLocalData() async {
     final prefs = await SharedPreferences.getInstance();
     
-    // Load Albums
     final albumsJson = prefs.getString('albums');
     if (albumsJson != null) {
-      final List decoded = jsonDecode(albumsJson);
-      albums = decoded.map((e) => CustomAlbum.fromJson(e)).toList();
+      albums = (jsonDecode(albumsJson) as List).map((e) => CustomAlbum.fromJson(e)).toList();
     }
 
-    // Load Labels
     final labelsJson = prefs.getString('labels');
     if (labelsJson != null) {
-      labels = Map<String, List<String>>.from(
-        (jsonDecode(labelsJson) as Map).map((k, v) => MapEntry(k, List<String>.from(v))),
-      );
+      photoLabels = Map<String, List<String>>.from((jsonDecode(labelsJson) as Map).map((k, v) => MapEntry(k, List<String>.from(v))));
     }
 
-    // Load Trash
-    trashedPhotoIds = prefs.getStringList('trash') ?? [];
+    final trashJson = prefs.getString('trash');
+    if (trashJson != null) {
+      Map<String, dynamic> decoded = jsonDecode(trashJson);
+      decoded.forEach((k, v) => trashedItems[k] = DateTime.parse(v));
+    }
+
+    hiddenFolders = (prefs.getStringList('hiddenFolders') ?? []).toSet();
   }
 
   Future<void> _saveLocalData() async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('albums', jsonEncode(albums.map((e) => e.toJson()).toList()));
-    await prefs.setString('labels', jsonEncode(labels));
-    await prefs.setStringList('trash', trashedPhotoIds);
+    await prefs.setString('labels', jsonEncode(photoLabels));
+    
+    Map<String, String> trashMap = {};
+    trashedItems.forEach((k, v) => trashMap[k] = v.toIso8601String());
+    await prefs.setString('trash', jsonEncode(trashMap));
+    
+    await prefs.setStringList('hiddenFolders', hiddenFolders.toList());
   }
 
   Future<void> _loadMedia() async {
     final PermissionState ps = await PhotoManager.requestPermissionExtend();
     if (ps.hasAccess) {
-      final paths = await PhotoManager.getAssetPathList(type: RequestType.image, onlyAll: true);
-      if (paths.isNotEmpty) {
-        final photos = await paths[0].getAssetListPaged(page: 0, size: 3000);
+      allFolders = await PhotoManager.getAssetPathList(type: RequestType.image, onlyAll: false);
+      final mainPath = await PhotoManager.getAssetPathList(type: RequestType.image, onlyAll: true);
+      
+      if (mainPath.isNotEmpty) {
+        final photos = await mainPath[0].getAssetListPaged(page: 0, size: 5000);
         
-        // Filter yang ada di sampah
-        allPhotos = photos.where((p) => !trashedPhotoIds.contains(p.id)).toList();
-        allPhotos.sort((a, b) => b.modifiedDateTime.compareTo(a.modifiedDateTime));
-        
+        // Auto-delete sampah > 30 hari
+        final now = DateTime.now();
+        final expiredIds = trashedItems.entries.where((e) => now.difference(e.value).inDays >= 30).map((e) => e.key).toList();
+        if (expiredIds.isNotEmpty) {
+          await PhotoManager.editor.deleteWithIds(expiredIds);
+          for (var id in expiredIds) trashedItems.remove(id);
+          await _saveLocalData();
+        }
+
+        allPhotos = photos.where((p) => !trashedItems.containsKey(p.id)).toList();
+        _sortPhotos();
         _groupPhotos();
       }
     }
   }
 
+  void _sortPhotos() {
+    allPhotos.sort((a, b) => isAscending 
+        ? a.createDateTime.compareTo(b.createDateTime)
+        : b.createDateTime.compareTo(a.createDateTime));
+  }
+
+  void toggleSort() {
+    isAscending = !isAscending;
+    _sortPhotos();
+    _groupPhotos();
+    notifyListeners();
+  }
+
+  void toggleHideFolder(String path) {
+    if (hiddenFolders.contains(path)) {
+      hiddenFolders.remove(path);
+    } else {
+      hiddenFolders.add(path);
+    }
+    _saveLocalData();
+    _groupPhotos();
+    notifyListeners();
+  }
+
   void _groupPhotos() {
     groupedPhotos.clear();
     final now = DateTime.now();
-    final yesterday = now.subtract(const Duration(days: 1));
 
     for (var photo in allPhotos) {
-      // Filter Label
+      if (hiddenFolders.contains(photo.relativePath)) continue;
+      
       if (selectedLabelFilter.isNotEmpty) {
-        final photoLabels = labels[photo.id] ?? [];
-        if (!photoLabels.contains(selectedLabelFilter)) continue;
+        final labels = photoLabels[photo.id] ?? [];
+        if (!labels.contains(selectedLabelFilter)) continue;
       }
 
-      final date = photo.modifiedDateTime;
-      String key;
-      if (date.year == now.year && date.month == now.month && date.day == now.day) {
-        key = 'Hari Ini';
-      } else if (date.year == yesterday.year && date.month == yesterday.month && date.day == yesterday.day) {
-        key = 'Kemarin';
-      } else {
-        key = '${date.day} ${_monthName(date.month)} ${date.year}';
-      }
+      final date = photo.createDateTime;
+      String key = '${date.day} ${_monthName(date.month)} ${date.year}';
+      
+      if (date.year == now.year && date.month == now.month && date.day == now.day) key = 'Hari Ini';
+      
       groupedPhotos.putIfAbsent(key, () => []).add(photo);
     }
   }
 
   String _monthName(int month) {
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
-    return months[month - 1];
+    const m = ['Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun', 'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des'];
+    return m[month - 1];
   }
 
-  // FITUR: Hapus (Masuk Sampah)
+  // FITUR MANAJEMEN
   Future<void> moveToTrash(List<AssetEntity> photos) async {
-    for (var p in photos) {
-      if (!trashedPhotoIds.contains(p.id)) trashedPhotoIds.add(p.id);
-    }
-    allPhotos.removeWhere((p) => trashedPhotoIds.contains(p.id));
+    for (var p in photos) trashedItems[p.id] = DateTime.now();
+    allPhotos.removeWhere((p) => trashedItems.containsKey(p.id));
     _groupPhotos();
     await _saveLocalData();
     notifyListeners();
   }
 
-  // FITUR: Buat Album
+  Future<void> restoreFromTrash(String photoId) async {
+    trashedItems.remove(photoId);
+    await _loadMedia();
+    notifyListeners();
+  }
+
+  Future<void> emptyTrash() async {
+    final ids = trashedItems.keys.toList();
+    await PhotoManager.editor.deleteWithIds(ids);
+    trashedItems.clear();
+    await _saveLocalData();
+    notifyListeners();
+  }
+
   void createAlbum(String name) {
     albums.add(CustomAlbum(id: const Uuid().v4(), name: name, photoIds: []));
     _saveLocalData();
     notifyListeners();
   }
 
-  // FITUR: Tambah ke Album
   void addToAlbum(String albumId, List<AssetEntity> photos) {
     final album = albums.firstWhere((a) => a.id == albumId);
     for (var p in photos) {
@@ -146,32 +196,21 @@ class GalleryState extends ChangeNotifier {
     notifyListeners();
   }
 
-  // FITUR: Tambah Label
   void addLabel(List<AssetEntity> photos, String label) {
     for (var p in photos) {
-      final currentLabels = labels[p.id] ?? [];
-      if (!currentLabels.contains(label)) {
-        currentLabels.add(label);
-        labels[p.id] = currentLabels;
+      final current = photoLabels[p.id] ?? [];
+      if (!current.contains(label)) {
+        current.add(label);
+        photoLabels[p.id] = current;
       }
     }
     _saveLocalData();
     notifyListeners();
   }
 
-  // FITUR: Ambil Semua Label Unik
   List<String> getAllUniqueLabels() {
     final Set<String> unique = {};
-    for (var l in labels.values) {
-      unique.addAll(l);
-    }
+    for (var l in photoLabels.values) unique.addAll(l);
     return unique.toList();
-  }
-
-  // FITUR: Set Filter Label
-  void setFilterLabel(String label) {
-    selectedLabelFilter = label;
-    _groupPhotos();
-    notifyListeners();
   }
 }
