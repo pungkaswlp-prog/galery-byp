@@ -1,10 +1,11 @@
 import 'dart:io';
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
-import 'package:photo_manager_image_provider/photo_manager_image_provider.dart';
-import 'package:photo_view/photo_view.dart';
+import 'package:extended_image/extended_image.dart';
 import 'package:lucide_icons/lucide_icons.dart';
 import 'package:intl/intl.dart';
+import 'package:exif/exif.dart';
 
 class PhotoViewerScreen extends StatefulWidget {
   final List<AssetEntity> photos;
@@ -21,12 +22,17 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   late int _currentIndex;
   bool _showUi = true;
   bool _showDetails = false;
+  
+  // State untuk EXIF
+  Map<String, IfdTag> _exifData = {};
+  bool _isLoadingExif = false;
 
   @override
   void initState() {
     super.initState();
     _currentIndex = widget.initialIndex;
     _pageController = PageController(initialPage: _currentIndex);
+    _loadExif(widget.photos[_currentIndex]);
   }
 
   @override
@@ -39,6 +45,30 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     setState(() {
       _showDetails = !_showDetails;
     });
+  }
+
+  // Fungsi membaca EXIF dari file foto
+  Future<void> _loadExif(AssetEntity photo) async {
+    setState(() {
+      _isLoadingExif = true;
+      _exifData = {};
+    });
+
+    try {
+      final File? file = await photo.file;
+      if (file != null) {
+        final bytes = await file.readAsBytes();
+        final tags = await readExifFromBytes(bytes);
+        if (mounted) {
+          setState(() {
+            _exifData = tags;
+            _isLoadingExif = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingExif = false);
+    }
   }
 
   @override
@@ -56,13 +86,13 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             }),
             onVerticalDragEnd: (details) {
               if (details.primaryVelocity! < 0) {
-                // Swipe ke atas
+                // Swipe ke atas (Tampilkan Detail)
                 setState(() {
                   _showDetails = true;
                   _showUi = true;
                 });
               } else if (details.primaryVelocity! > 0) {
-                // Swipe ke bawah
+                // Swipe ke bawah (Sembunyikan Detail)
                 setState(() {
                   _showDetails = false;
                 });
@@ -73,13 +103,34 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               itemCount: widget.photos.length,
               onPageChanged: (index) {
                 setState(() => _currentIndex = index);
+                _loadExif(widget.photos[index]); // Muat EXIF saat ganti foto
               },
               itemBuilder: (context, index) {
                 final photo = widget.photos[index];
-                return PhotoView(
-                  imageProvider: AssetEntityImageProvider(photo, isOriginal: true),
-                  minScale: PhotoViewComputedScale.contained,
-                  maxScale: PhotoViewComputedScale.covered * 2,
+                return FutureBuilder<File?>(
+                  future: photo.file,
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData && snapshot.data != null) {
+                      // ExtendedImage memuat file asli (1:1) sehingga sangat jernih
+                      return ExtendedImage.file(
+                        snapshot.data!,
+                        fit: BoxFit.contain,
+                        mode: ExtendedImageMode.gesture,
+                        initGestureConfigHandler: (state) {
+                          return GestureConfig(
+                            minScale: 1.0,
+                            maxScale: 5.0,
+                            animationMinScale: 0.7,
+                            animationMaxScale: 5.0,
+                            inertialSpeed: 100.0,
+                            initialScale: 1.0,
+                            inPageView: true, // Penting: Agar geser kiri/kanan lancar
+                          );
+                        },
+                      );
+                    }
+                    return const Center(child: CircularProgressIndicator(color: Colors.white));
+                  },
                 );
               },
             ),
@@ -125,8 +176,9 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               child: Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.9),
-                  borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+                  color: Colors.black.withOpacity(0.95),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+                  border: Border.all(color: Colors.white12),
                 ),
                 child: SafeArea(
                   child: Column(
@@ -136,7 +188,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          const Text('Detail Foto', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                          const Text('Detail & EXIF', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                           IconButton(
                             icon: const Icon(LucideIcons.x, color: Colors.white),
                             onPressed: _toggleDetails,
@@ -148,7 +200,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       _buildInfoRow('Tanggal', DateFormat('EEEE, d MMMM yyyy - HH:mm').format(currentPhoto.modifiedDateTime)),
                       _buildInfoRow('Resolusi', '${currentPhoto.width} x ${currentPhoto.height}'),
                       
-                      // Perbaikan: Menghitung ukuran file secara async
                       FutureBuilder<File?>(
                         future: currentPhoto.file,
                         builder: (context, snapshot) {
@@ -167,14 +218,39 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                           return _buildInfoRow('Ukuran', 'Menghitung...');
                         },
                       ),
-                      // Info EXIF lengkap bisa ditambahkan di sini nanti
+
+                      // DATA KAMERA (EXIF)
+                      if (_isLoadingExif)
+                        const Padding(
+                          padding: EdgeInsets.only(top: 16.0),
+                          child: Center(child: CircularProgressIndicator()),
+                        )
+                      else if (_exifData.isNotEmpty) ...[
+                        const Divider(color: Colors.white24),
+                        const Text('Info Kamera', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        
+                        // Tampilkan data EXIF jika ada
+                        if (_exifData.containsKey('Image Model')) _buildInfoRow('Kamera', _exifData['Image Model'].toString()),
+                        if (_exifData.containsKey('EXIF FNumber')) _buildInfoRow('F-Stop', 'f/${_exifData['EXIF FNumber'].printable}'),
+                        if (_exifData.containsKey('EXIF ExposureTime')) _buildInfoRow('Kecepatan', '${_exifData['EXIF ExposureTime'].printable} s'),
+                        if (_exifData.containsKey('EXIF ISOSpeedRatings')) _buildInfoRow('ISO', _exifData['EXIF ISOSpeedRatings'].printable),
+                        if (_exifData.containsKey('EXIF FocalLength')) _buildInfoRow('Focal Length', '${_exifData['EXIF FocalLength'].printable} mm'),
+                        
+                        // Coba ambil FocalLengthIn35mmFilm (lebih umum di HP)
+                        if (_exifData.containsKey('EXIF FocalLengthIn35mmFilm')) 
+                          _buildInfoRow('Setara 35mm', '${_exifData['EXIF FocalLengthIn35mmFilm'].printable} mm'),
+                      ] else ...[
+                        const Divider(color: Colors.white24),
+                        const Text('Foto ini tidak memiliki data EXIF kamera.', style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
+                      ]
                     ],
                   ),
                 ),
               ),
             ),
 
-          // Bottom Action Bar (Minimal)
+          // Bottom Action Bar
           if (_showUi && !_showDetails)
             Positioned(
               bottom: 0, left: 0, right: 0,
@@ -213,12 +289,12 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
 
   Widget _buildInfoRow(String label, String value) {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6.0),
+      padding: const EdgeInsets.symmetric(vertical: 4.0),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          SizedBox(width: 100, child: Text(label, style: const TextStyle(color: Colors.white54))),
-          Expanded(child: Text(value, style: const TextStyle(color: Colors.white))),
+          SizedBox(width: 110, child: Text(label, style: const TextStyle(color: Colors.white54, fontSize: 13))),
+          Expanded(child: Text(value, style: const TextStyle(color: Colors.white, fontSize: 13))),
         ],
       ),
     );
