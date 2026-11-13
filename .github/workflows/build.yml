@@ -1,4 +1,4 @@
-name: Build & Release
+name: Build APK Release
 
 on:
   push:
@@ -7,12 +7,6 @@ on:
 
 permissions:
   contents: write
-  pages: write
-  id-token: write
-
-concurrency:
-  group: pages
-  cancel-in-progress: true
 
 jobs:
   build:
@@ -31,16 +25,15 @@ jobs:
           channel: stable
           cache: true
 
-      - name: Scaffold Android & Web
+      - name: Scaffold Android
         run: |
           [ -f pubspec.yaml ] && cp pubspec.yaml /tmp/pubspec.yaml.orig
           [ -d lib ] && cp -r lib /tmp/lib.orig
-          flutter create --platforms android,web \
+          flutter create --platforms android \
             --project-name galeri --org com.galeri .
           [ -f /tmp/pubspec.yaml.orig ] && cp /tmp/pubspec.yaml.orig pubspec.yaml
           [ -d /tmp/lib.orig ] && rm -rf lib && cp -r /tmp/lib.orig lib
 
-      # KUNCI RAHASIA: Cache Keystore agar selalu sama
       - name: Cache Keystore
         id: cache-keystore
         uses: actions/cache@v4
@@ -96,14 +89,3 @@ jobs:
           tag_name: build-${{ github.run_number }}
           name: Build ${{ github.run_number }}
           files: galeri.apk
-
-      - name: Build Web
-        run: flutter build web --release --base-href /${{ github.event.repository.name }}/
-
-      - uses: actions/configure-pages@v4
-
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: build/web
-
-      - uses: actions/deploy-pages@v4
