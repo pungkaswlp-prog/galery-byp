@@ -22,7 +22,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
   bool _showUi = true;
   bool _showDetails = false;
   
-  // State untuk EXIF
   Map<String, IfdTag> _exifData = {};
   bool _isLoadingExif = false;
 
@@ -46,7 +45,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
     });
   }
 
-  // Fungsi membaca EXIF dari file foto
   Future<void> _loadExif(AssetEntity photo) async {
     setState(() {
       _isLoadingExif = true;
@@ -64,6 +62,8 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             _isLoadingExif = false;
           });
         }
+      } else {
+        if (mounted) setState(() => _isLoadingExif = false);
       }
     } catch (e) {
       if (mounted) setState(() => _isLoadingExif = false);
@@ -77,7 +77,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Area Foto & Gestur
           GestureDetector(
             onTap: () => setState(() {
               _showUi = !_showUi;
@@ -85,13 +84,11 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             }),
             onVerticalDragEnd: (details) {
               if (details.primaryVelocity! < 0) {
-                // Swipe ke atas (Tampilkan Detail)
                 setState(() {
                   _showDetails = true;
                   _showUi = true;
                 });
               } else if (details.primaryVelocity! > 0) {
-                // Swipe ke bawah (Sembunyikan Detail)
                 setState(() {
                   _showDetails = false;
                 });
@@ -102,7 +99,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               itemCount: widget.photos.length,
               onPageChanged: (index) {
                 setState(() => _currentIndex = index);
-                _loadExif(widget.photos[index]); // Muat EXIF saat ganti foto
+                _loadExif(widget.photos[index]);
               },
               itemBuilder: (context, index) {
                 final photo = widget.photos[index];
@@ -110,7 +107,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                   future: photo.file,
                   builder: (context, snapshot) {
                     if (snapshot.hasData && snapshot.data != null) {
-                      // ExtendedImage memuat file asli (1:1) sehingga sangat jernih
                       return ExtendedImage.file(
                         snapshot.data!,
                         fit: BoxFit.contain,
@@ -123,7 +119,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                             animationMaxScale: 5.0,
                             inertialSpeed: 100.0,
                             initialScale: 1.0,
-                            inPageView: true, // Penting: Agar geser kiri/kanan lancar
+                            inPageView: true,
                           );
                         },
                       );
@@ -135,7 +131,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
             ),
           ),
           
-          // Top Bar (Back & Counter)
           if (_showUi)
             Positioned(
               top: 0, left: 0, right: 0,
@@ -158,9 +153,7 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                       const Spacer(),
                       IconButton(
                         icon: const Icon(LucideIcons.maximize, color: Colors.white),
-                        onPressed: () {
-                          // Fitur horizontal (bisa ditambahkan nanti)
-                        },
+                        onPressed: () {},
                       ),
                     ],
                   ),
@@ -168,7 +161,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               ),
             ),
 
-          // Panel EXIF / Detail (Swipe Up)
           if (_showDetails)
             Positioned(
               bottom: 0, left: 0, right: 0,
@@ -218,7 +210,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         },
                       ),
 
-                      // DATA KAMERA (EXIF)
                       if (_isLoadingExif)
                         const Padding(
                           padding: EdgeInsets.only(top: 16.0),
@@ -229,7 +220,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         const Text('Info Kamera', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         
-                        // PERBAIKAN: Menambahkan tanda ! untuk Null Safety
                         if (_exifData.containsKey('Image Model')) 
                           _buildInfoRow('Kamera', _exifData['Image Model']!.printable),
                         if (_exifData.containsKey('EXIF FNumber')) 
@@ -253,7 +243,6 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
               ),
             ),
 
-          // Bottom Action Bar
           if (_showUi && !_showDetails)
             Positioned(
               bottom: 0, left: 0, right: 0,
