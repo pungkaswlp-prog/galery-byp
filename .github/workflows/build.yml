@@ -29,8 +29,7 @@ jobs:
         run: |
           [ -f pubspec.yaml ] && cp pubspec.yaml /tmp/pubspec.yaml.orig
           [ -d lib ] && cp -r lib /tmp/lib.orig
-          flutter create --platforms android \
-            --project-name galeri --org com.galeri .
+          flutter create --platforms android --project-name galeri --org com.galeri .
           [ -f /tmp/pubspec.yaml.orig ] && cp /tmp/pubspec.yaml.orig pubspec.yaml
           [ -d /tmp/lib.orig ] && rm -rf lib && cp -r /tmp/lib.orig lib
 
@@ -50,11 +49,7 @@ jobs:
       - name: Fix SDK and Signing
         run: |
           GRADLE_FILE=android/app/build.gradle
-          
-          # Paksa Android SDK 36 untuk photo_manager
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' $GRADLE_FILE
-          
-          # Gunakan keystore dari cache
           sed -i '/signingConfigs {/,/}/d' $GRADLE_FILE
           sed -i '/buildTypes {/i\
               signingConfigs {\
