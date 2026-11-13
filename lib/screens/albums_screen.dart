@@ -9,10 +9,9 @@ class AlbumsScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final state = context.watch<GalleryState>();
-
     return Scaffold(
       body: state.albums.isEmpty
-          ? const Center(child: Text('Belum ada album. Tekan + untuk membuat.'))
+          ? const Center(child: Text('Belum ada album.'))
           : ListView.builder(
               itemCount: state.albums.length,
               itemBuilder: (context, index) {
@@ -21,38 +20,22 @@ class AlbumsScreen extends StatelessWidget {
                   leading: const Icon(LucideIcons.layers),
                   title: Text(album.name),
                   subtitle: Text('${album.photoIds.length} foto'),
-                  onTap: () {},
                 );
               },
             ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showCreateAlbumDialog(context),
+        onPressed: () {
+          final controller = TextEditingController();
+          showDialog(context: context, builder: (ctx) => AlertDialog(
+            title: const Text('Buat Album'),
+            content: TextField(controller: controller, decoration: const InputDecoration(hintText: 'Nama Album')),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
+              TextButton(onPressed: () { if (controller.text.isNotEmpty) state.createAlbum(controller.text.trim()); Navigator.pop(ctx); }, child: const Text('Buat')),
+            ],
+          ));
+        },
         child: const Icon(LucideIcons.plus),
-      ),
-    );
-  }
-
-  void _showCreateAlbumDialog(BuildContext context) {
-    final state = context.read<GalleryState>();
-    final controller = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('Buat Album Baru'),
-        content: TextField(
-          controller: controller,
-          decoration: const InputDecoration(hintText: 'Nama Album'),
-        ),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Batal')),
-          TextButton(
-            onPressed: () {
-              if (controller.text.isNotEmpty) state.createAlbum(controller.text.trim());
-              Navigator.pop(ctx);
-            },
-            child: const Text('Buat'),
-          ),
-        ],
       ),
     );
   }
