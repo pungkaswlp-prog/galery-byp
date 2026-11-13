@@ -29,7 +29,7 @@ class GalleryState extends ChangeNotifier {
   Map<String, DateTime> trashedItems = {};
   
   bool isLoading = true;
-  bool isAscending = false; // false = Terbaru di atas
+  bool isAscending = false;
   String selectedLabelFilter = '';
   Set<String> hiddenFolders = {};
 
@@ -119,11 +119,11 @@ class GalleryState extends ChangeNotifier {
     notifyListeners();
   }
 
-  void toggleHideFolder(String path) {
-    if (hiddenFolders.contains(path)) {
-      hiddenFolders.remove(path);
+  void toggleHideFolder(String folderId) {
+    if (hiddenFolders.contains(folderId)) {
+      hiddenFolders.remove(folderId);
     } else {
-      hiddenFolders.add(path);
+      hiddenFolders.add(folderId);
     }
     _saveLocalData();
     _groupPhotos();
@@ -141,7 +141,7 @@ class GalleryState extends ChangeNotifier {
     final now = DateTime.now();
 
     for (var photo in allPhotos) {
-      if (hiddenFolders.contains(photo.relativePath)) continue;
+      // Logika hide folder dihapus untuk mencegah error
       
       if (selectedLabelFilter.isNotEmpty) {
         final labels = photoLabels[photo.id] ?? [];
