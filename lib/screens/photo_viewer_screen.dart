@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:extended_image/extended_image.dart';
@@ -230,16 +229,20 @@ class _PhotoViewerScreenState extends State<PhotoViewerScreen> {
                         const Text('Info Kamera', style: TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
                         
-                        // Tampilkan data EXIF jika ada
-                        if (_exifData.containsKey('Image Model')) _buildInfoRow('Kamera', _exifData['Image Model'].toString()),
-                        if (_exifData.containsKey('EXIF FNumber')) _buildInfoRow('F-Stop', 'f/${_exifData['EXIF FNumber'].printable}'),
-                        if (_exifData.containsKey('EXIF ExposureTime')) _buildInfoRow('Kecepatan', '${_exifData['EXIF ExposureTime'].printable} s'),
-                        if (_exifData.containsKey('EXIF ISOSpeedRatings')) _buildInfoRow('ISO', _exifData['EXIF ISOSpeedRatings'].printable),
-                        if (_exifData.containsKey('EXIF FocalLength')) _buildInfoRow('Focal Length', '${_exifData['EXIF FocalLength'].printable} mm'),
+                        // PERBAIKAN: Menambahkan tanda ! untuk Null Safety
+                        if (_exifData.containsKey('Image Model')) 
+                          _buildInfoRow('Kamera', _exifData['Image Model']!.printable),
+                        if (_exifData.containsKey('EXIF FNumber')) 
+                          _buildInfoRow('F-Stop', 'f/${_exifData['EXIF FNumber']!.printable}'),
+                        if (_exifData.containsKey('EXIF ExposureTime')) 
+                          _buildInfoRow('Kecepatan', '${_exifData['EXIF ExposureTime']!.printable} s'),
+                        if (_exifData.containsKey('EXIF ISOSpeedRatings')) 
+                          _buildInfoRow('ISO', _exifData['EXIF ISOSpeedRatings']!.printable),
+                        if (_exifData.containsKey('EXIF FocalLength')) 
+                          _buildInfoRow('Focal Length', '${_exifData['EXIF FocalLength']!.printable} mm'),
                         
-                        // Coba ambil FocalLengthIn35mmFilm (lebih umum di HP)
                         if (_exifData.containsKey('EXIF FocalLengthIn35mmFilm')) 
-                          _buildInfoRow('Setara 35mm', '${_exifData['EXIF FocalLengthIn35mmFilm'].printable} mm'),
+                          _buildInfoRow('Setara 35mm', '${_exifData['EXIF FocalLengthIn35mmFilm']!.printable} mm'),
                       ] else ...[
                         const Divider(color: Colors.white24),
                         const Text('Foto ini tidak memiliki data EXIF kamera.', style: TextStyle(color: Colors.white54, fontStyle: FontStyle.italic)),
