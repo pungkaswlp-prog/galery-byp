@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:photo_manager/photo_manager.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -27,10 +26,10 @@ class GalleryState extends ChangeNotifier {
   
   List<CustomAlbum> albums = [];
   Map<String, List<String>> photoLabels = {};
-  Map<String, DateTime> trashedItems = {}; // photoId -> tanggal dihapus
+  Map<String, DateTime> trashedItems = {};
   
   bool isLoading = true;
-  bool isAscending = false; // Urutan: Newest / Oldest
+  bool isAscending = false; // false = Terbaru di atas
   String selectedLabelFilter = '';
   Set<String> hiddenFolders = {};
 
@@ -92,7 +91,6 @@ class GalleryState extends ChangeNotifier {
       if (mainPath.isNotEmpty) {
         final photos = await mainPath[0].getAssetListPaged(page: 0, size: 5000);
         
-        // Auto-delete sampah > 30 hari
         final now = DateTime.now();
         final expiredIds = trashedItems.entries.where((e) => now.difference(e.value).inDays >= 30).map((e) => e.key).toList();
         if (expiredIds.isNotEmpty) {
@@ -132,6 +130,12 @@ class GalleryState extends ChangeNotifier {
     notifyListeners();
   }
 
+  void setFilterLabel(String label) {
+    selectedLabelFilter = label;
+    _groupPhotos();
+    notifyListeners();
+  }
+
   void _groupPhotos() {
     groupedPhotos.clear();
     final now = DateTime.now();
@@ -158,25 +162,10 @@ class GalleryState extends ChangeNotifier {
     return m[month - 1];
   }
 
-  // FITUR MANAJEMEN
   Future<void> moveToTrash(List<AssetEntity> photos) async {
     for (var p in photos) trashedItems[p.id] = DateTime.now();
     allPhotos.removeWhere((p) => trashedItems.containsKey(p.id));
     _groupPhotos();
-    await _saveLocalData();
-    notifyListeners();
-  }
-
-  Future<void> restoreFromTrash(String photoId) async {
-    trashedItems.remove(photoId);
-    await _loadMedia();
-    notifyListeners();
-  }
-
-  Future<void> emptyTrash() async {
-    final ids = trashedItems.keys.toList();
-    await PhotoManager.editor.deleteWithIds(ids);
-    trashedItems.clear();
     await _saveLocalData();
     notifyListeners();
   }
