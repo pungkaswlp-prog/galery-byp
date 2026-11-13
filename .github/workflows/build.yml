@@ -40,18 +40,28 @@ jobs:
           [ -f /tmp/pubspec.yaml.orig ] && cp /tmp/pubspec.yaml.orig pubspec.yaml
           [ -d /tmp/lib.orig ] && rm -rf lib && cp -r /tmp/lib.orig lib
 
+      # KUNCI RAHASIA: Cache Keystore agar selalu sama
+      - name: Cache Keystore
+        id: cache-keystore
+        uses: actions/cache@v4
+        with:
+          path: ~/.android/debug.keystore
+          key: debug-keystore-v1
+
+      - name: Generate Keystore if not cached
+        if: steps.cache-keystore.outputs.cache-hit != 'true'
+        run: |
+          mkdir -p ~/.android
+          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
+
       - name: Fix SDK and Signing
         run: |
           GRADLE_FILE=android/app/build.gradle
           
-          # 1. Paksa Android SDK 36 untuk photo_manager
+          # Paksa Android SDK 36 untuk photo_manager
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/g' $GRADLE_FILE
           
-          # 2. Hapus keystore bawaan server dan buat yang baru secara konsisten
-          rm -f ~/.android/debug.keystore
-          mkdir -p ~/.android
-          keytool -genkey -v -keystore ~/.android/debug.keystore -storepass android -alias androiddebugkey -keypass android -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=Android Debug,O=Android,C=US"
-          
+          # Gunakan keystore dari cache
           sed -i '/signingConfigs {/,/}/d' $GRADLE_FILE
           sed -i '/buildTypes {/i\
               signingConfigs {\
