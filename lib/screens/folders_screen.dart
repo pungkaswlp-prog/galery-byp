@@ -19,19 +19,12 @@ class _FoldersScreenState extends State<FoldersScreen> {
   }
 
   Future<void> _loadFolders() async {
-    final PermissionState ps = await PhotoManager.requestPermissionExtend();
-    if (ps.hasAccess) {
-      // onlyAll: false berarti mengambil SEMUA folder, bukan hanya folder utama
-      final List<AssetPathEntity> paths = await PhotoManager.getAssetPathList(
-        type: RequestType.image,
-        onlyAll: false, 
-      );
-      if (mounted) {
-        setState(() {
-          _folders = paths;
-          _isLoading = false;
-        });
-      }
+    final paths = await PhotoManager.getAssetPathList(type: RequestType.image, onlyAll: false);
+    if (mounted) {
+      setState(() {
+        _folders = paths;
+        _isLoading = false;
+      });
     }
   }
 
@@ -48,16 +41,9 @@ class _FoldersScreenState extends State<FoldersScreen> {
           title: Text(folder.name),
           subtitle: FutureBuilder<int>(
             future: folder.assetCountAsync,
-            builder: (context, snapshot) {
-              return Text('${snapshot.data ?? 0} foto');
-            },
+            builder: (context, snapshot) => Text('${snapshot.data ?? 0} foto'),
           ),
-          onTap: () {
-            // Navigasi ke grid khusus folder ini bisa ditambahkan nanti
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('Membuka folder: ${folder.name}')),
-            );
-          },
+          onTap: () {},
         );
       },
     );
