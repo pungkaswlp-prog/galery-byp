@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:lucide_icons/lucide_icons.dart';
+import 'theme.dart';
 import 'screens/photos_screen.dart';
 import 'screens/folders_screen.dart';
 import 'screens/albums_screen.dart';
@@ -13,18 +15,9 @@ class GaleriApp extends StatelessWidget {
     return MaterialApp(
       title: 'Galeri',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: Colors.blue),
-        useMaterial3: true,
-      ),
-      darkTheme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(
-          seedColor: Colors.blue,
-          brightness: Brightness.dark,
-        ),
-        useMaterial3: true,
-      ),
-      themeMode: ThemeMode.system, // Otomatis ikut HP
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system,
       home: const MainNavigation(),
     );
   }
@@ -48,7 +41,12 @@ class _MainNavigationState extends State<MainNavigation> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Galeri')),
+      appBar: AppBar(
+        title: Text(
+          ['Photos', 'Folders', 'Albums'][_currentIndex],
+          style: const TextStyle(fontWeight: FontWeight.w600),
+        ),
+      ),
       body: _screens[_currentIndex],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
@@ -56,9 +54,9 @@ class _MainNavigationState extends State<MainNavigation> {
           setState(() => _currentIndex = index);
         },
         destinations: const [
-          NavigationDestination(icon: Icon(Icons.photo), label: 'Photos'),
-          NavigationDestination(icon: Icon(Icons.folder), label: 'Folders'),
-          NavigationDestination(icon: Icon(Icons.collections_bookmark), label: 'Albums'),
+          NavigationDestination(icon: Icon(LucideIcons.image), label: 'Photos'),
+          NavigationDestination(icon: Icon(LucideIcons.folder), label: 'Folders'),
+          NavigationDestination(icon: Icon(LucideIcons.layers), label: 'Albums'),
         ],
       ),
     );
